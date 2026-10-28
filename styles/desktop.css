@@ -1,0 +1,191 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+#desktop {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at 20% 20%, #38bdf8 0%, #6366f1 45%, #1e1b4b 100%);
+}
+
+#icons {
+  position: absolute; top: 20px; left: 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.desktop-icon {
+  width: 84px; padding: 10px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  cursor: pointer; border-radius: 10px; color: #fff; user-select: none;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(0px);
+}
+.desktop-icon:hover { 
+  background: rgba(255,255,255,0.15); 
+  backdrop-filter: blur(8px);
+}
+.desktop-icon .glyph {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.desktop-icon .label { font-size: 12px; font-weight: 500; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+
+.window {
+  position: absolute; display: flex; flex-direction: column;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px); /* Efek Kaca */
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  overflow: hidden;
+  min-width: 300px;
+}
+.titlebar {
+  height: 44px; display: flex; align-items: center;
+  background: rgba(255, 255, 255, 0.5); 
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  color: #1e293b;
+  padding: 0 8px 0 16px; cursor: move; user-select: none;
+}
+.titlebar-title { flex: 1; font-size: 13px; font-weight: 600; letter-spacing: 0.3px; }
+.titlebar-buttons { display: flex; gap: 4px; }
+.titlebar-buttons button {
+  width: 36px; height: 28px; background: transparent; border: none;
+  color: #64748b; font-size: 14px; cursor: pointer; border-radius: 6px;
+  transition: all 0.15s;
+}
+.titlebar-buttons button:hover { background: rgba(0,0,0,0.06); color: #0f172a; }
+.titlebar-buttons .tb-close:hover { background: #ef4444; color: #fff; }
+.window-content { flex: 1; overflow: auto; padding: 16px; }
+
+#taskbar {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  height: 56px; width: calc(100% - 32px); max-width: 900px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 16px;
+  display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.2);
+}
+#start-btn {
+  width: 40px; height: 40px; border-radius: 8px; border: none;
+  background: #0ea5e9; color: #fff; font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+}
+#start-btn:hover { background: #0284c7; transform: scale(1.05); }
+#task-list { flex: 1; display: flex; gap: 6px; overflow: hidden; }
+.task-btn {
+  height: 40px; padding: 0 16px; border-radius: 8px;
+  background: rgba(0,0,0,0.04); border: 1px solid transparent;
+  color: #1e293b; font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.2s;
+}
+.task-btn:hover { background: rgba(0,0,0,0.08); }
+#tray {
+  display: flex; align-items: center; gap: 16px;
+  color: #334155; font-weight: 500; font-size: 12px; padding-right: 8px;
+}
+#tray-metrics { font-family: ui-monospace, monospace; }
+
+/* --- UI APLIKASI --- */
+.app-section { margin-bottom: 14px; }
+.app-label { font-size: 12px; color: #475569; margin-bottom: 6px; }
+.app-row { display: flex; gap: 8px; }
+
+/* Tombol Utama (Biru) */
+.btn-primary {
+  padding: 8px 16px; border-radius: 6px; border: none;
+  background: #0ea5e9; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+}
+.btn-primary:hover { background: #0284c7; }
+.btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+
+/* Tombol Sekunder (Putih) */
+.btn-secondary {
+  padding: 8px 14px; border-radius: 6px;
+  border: 1px solid #cbd5e1; background: #fff;
+  color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+}
+.btn-secondary:hover { background: #f1f5f9; }
+
+/* Tombol Algoritma */
+.btn-algo {
+  padding: 6px 14px; border-radius: 6px;
+  border: 1px solid #cbd5e1; background: #fff;
+  color: #0f172a; font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+}
+.btn-algo:hover { background: #f1f5f9; }
+.btn-algo.active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+
+/* Tabel */
+.app-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.app-table th, .app-table td {
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid #e2e8f0;
+}
+.app-table th { color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.app-table .empty { color: #94a3b8; font-style: italic; }
+
+/* Frame Memori */
+.frames { display: flex; gap: 6px; }
+.frame {
+  width: 64px; height: 44px; border-radius: 6px;
+  border: 2px dashed #cbd5e1; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: ui-monospace, monospace; font-size: 13px; color: #94a3b8;
+}
+.frame.filled { border-style: solid; border-color: #0ea5e9; color: #0f172a; background: #e0f2fe; font-weight: 600; }
+
+/* Terminal */
+.terminal-body {
+  height: 100%; background: #0f172a; color: #94f8c8;
+  font-family: ui-monospace, 'Cascadia Code', monospace; font-size: 12px;
+  padding: 10px; border-radius: 6px; overflow: auto; white-space: pre;
+}
+.terminal-body div { padding: 1px 0; }
+
+.resize-handle {
+  position: absolute; 
+  right: 5px; 
+  bottom: 5px; 
+  width: 20px; 
+  height: 20px;
+  cursor: se-resize; 
+  z-index: 1000;
+  
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M13 5L5 13'/%3E%3Cpath d='M13 9L9 13'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: bottom right;
+}
+
+#start-menu {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  width: 260px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.4); border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.2); flex-direction: column;
+  padding: 8px; z-index: 9999;
+}
+.start-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  cursor: pointer; border-radius: 8px; color: #1e293b; font-size: 13px; font-weight: 500;
+}
+.start-item:hover { background: rgba(0,0,0,0.05); }
+.start-item svg { width: 18px; height: 18px; }
+
+.task-btn.active {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  font-weight: 700;
+  border-bottom: 3px solid #0ea5e9;
+}
+.gantt-block {
+  min-width: 40px; height: 32px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700; border-radius: 4px;
+}
+.start-title { padding: 12px; font-weight: 700; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.start-icon { display: inline-flex; }
+.start-icon svg { width: 18px; height: 18px; }

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>MiniOS: Gerbang Uji Logika</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; color: #0f172a; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sum { font-weight: 700; margin: 8px 0 16px; }
+  .sum.ok { color: #15803d; } .sum.bad { color: #b91c1c; }
+  table { border-collapse: collapse; width: 100%; max-width: 980px; font-size: 13px; }
+  th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; }
+  .PASS { color: #15803d; font-weight: 700; } .FAIL { color: #b91c1c; font-weight: 700; } .SKIP { color: #a16207; font-weight: 700; }
+  code { font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>MiniOS: Gerbang Uji Logika</h1>
+<div>Buka halaman ini lewat server lokal (misalnya <code>npx serve .</code> atau Live Server). Modul yang belum dibuat ditandai SKIP, bukan error. Semua kasus harus PASS sebelum membuat Pull Request.</div>
+<div id="sum" class="sum">Menjalankan...</div>
+<table><thead><tr><th>Modul</th><th>Kasus</th><th>Hasil</th><th>Detail</th></tr></thead><tbody id="rows"></tbody></table>
+
+<script src="../modules/cpu/logic.js"></script>
+<script src="../modules/memory/logic.js"></script>
+<script src="../modules/disk/logic.js"></script>
+<script src="../modules/monitor/logic.js"></script>
+<script src="../modules/analytics/logic.js"></script>
+<script>
+'use strict';
+const results = [];
+function record(mod, name, status, detail) { results.push({ mod, name, status, detail: detail || '' }); }
+function deepFreeze(o) { if (o && typeof o === 'object') { Object.values(o).forEach(deepFreeze); Object.freeze(o); } return o; }
+function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function close(a, b) { return typeof a === 'number' && Math.abs(a - b) < 1e-9; }
+function expect(cond, msg) { if (!cond) throw new Error(msg); }
+function expectEq(actual, expected, label) {
+  expect(same(actual, expected), label + ': diharapkan ' + JSON.stringify(expected) + ', didapat ' + JSON.stringify(actual));
+}
+function expectNum(actual, expected, label) {
+  expect(close(actual, expected), label + ': diharapkan ' + expected + ', didapat ' + actual);
+}
+function group(mod, api, cases) {
+  if (!api) { cases.forEach(([name]) => record(mod, name, 'SKIP', 'modul belum ada (window object tidak ditemukan)')); return; }
+  cases.forEach(([name, fn]) => {
+    try { fn(api); record(mod, name, 'PASS'); }
+    catch (e) { record(mod, name, 'FAIL', e.message); }
+  });
+}
+function okResult(r) { expect(r && r.ok === true && r.result, 'harus {ok:true, result}, didapat ' + JSON.stringify(r)); return r.result; }
+function errCode(r, code) {
+  expect(r && r.ok === false && r.error && typeof r.error.message === 'string', 'harus {ok:false, error:{code,message}}, didapat ' + JSON.stringify(r));
+  expect(r.error.code === code, 'kode error diharapkan ' + code + ', didapat ' + r.error.code);
+}
+const g = (arr) => arr.map(x => x.pid + ':' + x.start + ':' + x.end).join(' ');
+
+/* ===================== CPU ===================== */
+const P = [{ pid: 'P1', arrival: 0, burst: 6 }, { pid: 'P2', arrival: 1, burst: 3 }, { pid: 'P3', arrival: 2, burst: 8 }, { pid: 'P4', arrival: 3, burst: 2 }];
+const P0 = [{ pid: 'P1', burst: 6 }, { pid: 'P2', burst: 3 }, { pid: 'P3', burst: 8 }, { pid: 'P4', burst: 2 }];
+const cpu = (alg, procs, q) => ({ algorithm: alg, quantum: q, processes: procs });
+
+group('CPU', window.CpuLogic, [
+  ['FCFS data kedatangan bertahap', (L) => {
+    const r = okResult(L.run(cpu('FCFS', P, 2)));
+    expectEq(g(r.gantt), 'P1:0:6 P2:6:9 P3:9:17 P4:17:19', 'gantt');
+    expectNum(r.avgWaiting, 6.5, 'avgWaiting'); expectNum(r.avgTurnaround, 11.25, 'avgTurnaround');
+    const p2 = r.perProcess.find(x => x.pid === 'P2');
+    expectEq([p2.completion, p2.waiting, p2.turnaround, p2.response], [9, 5, 8, 5], 'P2 (completion,waiting,turnaround,response)');
+    const p4 = r.perProcess.find(x => x.pid === 'P4');
+    expectEq([p4.completion, p4.waiting, p4.turnaround, p4.response], [19, 14, 16, 14], 'P4');
+  }],
+  ['SJF non-preemptive data kedatangan bertahap', (L) => {
+    const r = okResult(L.run(cpu('SJF', P, 2)));
+    expectEq(g(r.gantt), 'P1:0:6 P4:6:8 P2:8:11 P3:11:19', 'gantt');
+    expectNum(r.avgWaiting, 4.75, 'avgWaiting'); expectNum(r.avgTurnaround, 9.5, 'avgTurnaround');
+  }],
+  ['RR q=2 data kedatangan bertahap', (L) => {
+    const r = okResult(L.run(cpu('RR', P, 2)));
+    expectEq(g(r.gantt), 'P1:0:2 P2:2:4 P3:4:6 P1:6:8 P4:8:10 P2:10:11 P3:11:13 P1:13:15 P3:15:17 P3:17:19', 'gantt');
+    expectNum(r.avgWaiting, 7.5, 'avgWaiting'); expectNum(r.avgTurnaround, 12.25, 'avgTurnaround');
+  }],
+  ['Data prototipe (arrival dihilangkan = 0): FCFS', (L) => {
+    const r = okResult(L.run(cpu('FCFS', P0, 2)));
+    expectNum(r.avgWaiting, 8, 'avgWaiting'); expectNum(r.avgTurnaround, 12.75, 'avgTurnaround');
+  }],
+  ['Data prototipe (arrival = 0): SJF', (L) => {
+    const r = okResult(L.run(cpu('SJF', P0, 2)));
+    expectEq(g(r.gantt), 'P4:0:2 P2:2:5 P1:5:11 P3:11:19', 'gantt');
+    expectNum(r.avgWaiting, 4.5, 'avgWaiting'); expectNum(r.avgTurnaround, 9.25, 'avgTurnaround');
+  }],
+  ['Data prototipe (arrival = 0): RR q=2', (L) => {
+    const r = okResult(L.run(cpu('RR', P0, 2)));
+    expectEq(g(r.gantt), 'P1:0:2 P2:2:4 P3:4:6 P4:6:8 P1:8:10 P2:10:11 P3:11:13 P1:13:15 P3:15:17 P3:17:19', 'gantt');
+    expectNum(r.avgWaiting, 8.5, 'avgWaiting'); expectNum(r.avgTurnaround, 13.25, 'avgTurnaround');
+  }],
+  ['Waktu menganggur: waktu melompat ke kedatangan berikutnya', (L) => {
+    const r = okResult(L.run(cpu('FCFS', [{ pid: 'A', arrival: 0, burst: 2 }, { pid: 'B', arrival: 5, burst: 2 }], 2)));
+    expectEq(g(r.gantt), 'A:0:2 B:5:7', 'gantt');
+    const b = r.perProcess.find(x => x.pid === 'B');
+    expectEq([b.waiting, b.response], [0, 0], 'B (waiting,response)');
+  }],
+  ['Seri SJF: arrival lebih awal lalu PID terkecil', (L) => {
+    const r = okResult(L.run(cpu('SJF', [{ pid: 'P2', arrival: 0, burst: 4 }, { pid: 'P1', arrival: 0, burst: 4 }, { pid: 'P3', arrival: 0, burst: 1 }], 2)));
+    expectEq(g(r.gantt), 'P3:0:1 P1:1:5 P2:5:9', 'gantt');
+  }],
+  ['perProcess mengikuti urutan input', (L) => {
+    const r = okResult(L.run(cpu('SJF', P, 2)));
+    expectEq(r.perProcess.map(x => x.pid), ['P1', 'P2', 'P3', 'P4'], 'urutan perProcess');
+  }],
+  ['Input tidak valid ditolak dengan ok:false', (L) => {
+    errCode(L.run(cpu('FCFS', [{ pid: 'A', arrival: 0, burst: 0 }], 2)), 'INVALID_INPUT');
+    errCode(L.run(cpu('FCFS', [{ pid: 'A', arrival: 0, burst: 1.5 }], 2)), 'INVALID_INPUT');
+    errCode(L.run(cpu('FCFS', [{ pid: 'A', arrival: -1, burst: 2 }], 2)), 'INVALID_INPUT');
+    errCode(L.run(cpu('FCFS', [{ pid: 'A', burst: 2 }, { pid: 'A', burst: 3 }], 2)), 'INVALID_INPUT');
+    errCode(L.run(cpu('FCFS', [{ pid: '', burst: 2 }], 2)), 'INVALID_INPUT');
+    errCode(L.run(cpu('FCFS', [], 2)), 'EMPTY_INPUT');
+    errCode(L.run(cpu('XYZ', P, 2)), 'UNKNOWN_ALGORITHM');
+    errCode(L.run(cpu('RR', P, undefined)), 'INVALID_INPUT');
+    errCode(L.run(cpu('RR', P, 0)), 'INVALID_INPUT');
+    errCode(L.run(cpu('FCFS', Array.from({ length: 21 }, (_, i) => ({ pid: 'P' + i, burst: 1 })), 2)), 'INVALID_INPUT');
+    errCode(L.run(null), 'INVALID_INPUT');
+    errCode(L.run(undefined), 'INVALID_INPUT');
+  }],
+  ['Fungsi murni: tidak mengubah input dan hasil sama untuk input sama', (L) => {
+    const input = deepFreeze(cpu('RR', JSON.parse(JSON.stringify(P)), 2));
+    const a = L.run(input), b = L.run(input);
+    expect(same(a, b), 'dua panggilan dengan input sama memberi hasil berbeda');
+  }],
+]);
+
+/* ===================== MEMORY ===================== */
+const R = [7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 2, 1, 2, 0, 1, 7, 0, 1];
+const mem = (alg, frames, refs) => ({ algorithm: alg, frames, refString: refs });
+
+group('Memory', window.MemoryLogic, [
+  ['FIFO: 15 fault, 5 hit', (L) => {
+    const r = okResult(L.run(mem('FIFO', 3, R)));
+    expectEq([r.faults, r.hits], [15, 5], '(faults,hits)'); expectNum(r.hitRatio, 0.25, 'hitRatio');
+    expectEq(r.steps.length, 20, 'jumlah steps');
+  }],
+  ['LRU: 12 fault, 8 hit', (L) => {
+    const r = okResult(L.run(mem('LRU', 3, R)));
+    expectEq([r.faults, r.hits], [12, 8], '(faults,hits)'); expectNum(r.hitRatio, 0.4, 'hitRatio');
+  }],
+  ['OPTIMAL: 9 fault, 11 hit', (L) => {
+    const r = okResult(L.run(mem('OPTIMAL', 3, R)));
+    expectEq([r.faults, r.hits], [9, 11], '(faults,hits)'); expectNum(r.hitRatio, 0.55, 'hitRatio');
+  }],
+  ['Data bawaan prototipe (4 frame, 13 referensi): FIFO 7, LRU 6, OPTIMAL 6', (L) => {
+    const refs = [7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 2];
+    expectEq(['FIFO', 'LRU', 'OPTIMAL'].map(a => okResult(L.run(mem(a, 4, refs))).faults), [7, 6, 6], 'faults FIFO/LRU/OPTIMAL');
+  }],
+  ['Isi steps FIFO: urutan frame berdasarkan waktu masuk', (L) => {
+    const s = okResult(L.run(mem('FIFO', 3, R))).steps;
+    expectEq(s[0], { index: 0, ref: 7, frames: [7], fault: true, evicted: null }, 'steps[0]');
+    expectEq(s[2], { index: 2, ref: 1, frames: [7, 0, 1], fault: true, evicted: null }, 'steps[2]');
+    expectEq(s[3], { index: 3, ref: 2, frames: [0, 1, 2], fault: true, evicted: 7 }, 'steps[3]');
+    expectEq(s[4], { index: 4, ref: 0, frames: [0, 1, 2], fault: false, evicted: null }, 'steps[4]');
+  }],
+  ['LRU: HIT memperbarui waktu pakai', (L) => {
+    const s = okResult(L.run(mem('LRU', 3, [1, 2, 3, 1, 4]))).steps;
+    expectEq(s[4], { index: 4, ref: 4, frames: [1, 3, 4], fault: true, evicted: 2 }, 'steps[4]');
+  }],
+  ['Frame kosong terisi dulu sebelum ada korban', (L) => {
+    const s = okResult(L.run(mem('OPTIMAL', 4, [1, 2, 3, 4, 5]))).steps;
+    expectEq(s.slice(0, 4).map(x => x.evicted), [null, null, null, null], 'evicted 4 langkah awal');
+    expect(s[4].evicted !== null, 'langkah ke-5 harus ada korban');
+  }],
+  ['OPTIMAL: page yang tidak dipakai lagi dikorbankan, seri = yang paling dulu masuk', (L) => {
+    const s = okResult(L.run(mem('OPTIMAL', 2, [1, 2, 3]))).steps;
+    expectEq(s[2].evicted, 1, 'evicted');
+  }],
+  ['Input tidak valid ditolak dengan ok:false', (L) => {
+    errCode(L.run(mem('FIFO', 0, R)), 'INVALID_INPUT');
+    errCode(L.run(mem('FIFO', 11, R)), 'INVALID_INPUT');
+    errCode(L.run(mem('FIFO', 3, [])), 'EMPTY_INPUT');
+    errCode(L.run(mem('FIFO', 3, [1, -1])), 'INVALID_INPUT');
+    errCode(L.run(mem('FIFO', 3, [1, 1.5])), 'INVALID_INPUT');
+    errCode(L.run(mem('FIFO', 3, Array.from({ length: 51 }, (_, i) => i % 5))), 'INVALID_INPUT');
+    errCode(L.run(mem('XYZ', 3, R)), 'UNKNOWN_ALGORITHM');
+    errCode(L.run(null), 'INVALID_INPUT');
+  }],
+  ['Fungsi murni: tidak mengubah input dan hasil sama untuk input sama', (L) => {
+    const input = deepFreeze(mem('OPTIMAL', 3, R.slice()));
+    expect(same(L.run(input), L.run(input)), 'dua panggilan dengan input sama memberi hasil berbeda');
+  }],
+]);
+
+/* ===================== DISK ===================== */
+const Q = [98, 183, 37, 122, 14, 124, 65, 67];
+const dk = (alg, q, extra) => Object.assign({ algorithm: alg, head: 53, maxCylinder: 199, direction: 'up', queue: q }, extra || {});
+
+group('Disk', window.DiskLogic, [
+  ['FCFS: total seek 640', (L) => {
+    const r = okResult(L.run(dk('FCFS', Q)));
+    expectNum(r.totalSeek, 640, 'totalSeek'); expectEq(r.order, Q, 'order');
+    expectEq(r.movements[0], { from: 53, to: 98, seek: 45 }, 'movements[0]');
+  }],
+  ['SSTF: total seek 236', (L) => {
+    const r = okResult(L.run(dk('SSTF', Q)));
+    expectNum(r.totalSeek, 236, 'totalSeek');
+    expectEq(r.order, [65, 67, 37, 14, 98, 122, 124, 183], 'order');
+  }],
+  ['SCAN naik sampai ujung: total seek 331', (L) => {
+    const r = okResult(L.run(dk('SCAN', Q)));
+    expectNum(r.totalSeek, 331, 'totalSeek');
+    expectEq(r.order, [65, 67, 98, 122, 124, 183, 199, 37, 14], 'order (ujung 199 ikut tercatat)');
+  }],
+  ['SCAN turun lebih dulu sampai ujung 0: total seek 236', (L) => {
+    const r = okResult(L.run(dk('SCAN', Q, { direction: 'down' })));
+    expectNum(r.totalSeek, 236, 'totalSeek');
+    expectEq(r.order, [37, 14, 0, 65, 67, 98, 122, 124, 183], 'order');
+  }],
+  ['SCAN: hanya ada permintaan di belakang, tetap ke ujung dulu', (L) => {
+    const r = okResult(L.run(dk('SCAN', [10])));
+    expectEq(r.order, [199, 10], 'order'); expectNum(r.totalSeek, 335, 'totalSeek');
+  }],
+  ['SSTF: seri jarak dipecah silinder lebih kecil', (L) => {
+    const r = okResult(L.run(dk('SSTF', [60, 40], { head: 50 })));
+    expectEq(r.order, [40, 60], 'order');
+  }],
+  ['direction diabaikan untuk FCFS dan SSTF', (L) => {
+    okResult(L.run(dk('FCFS', Q, { direction: 'left' })));
+    okResult(L.run(dk('SSTF', Q, { direction: undefined })));
+  }],
+  ['SCAN: direction tidak valid ditolak', (L) => {
+    errCode(L.run(dk('SCAN', Q, { direction: 'left' })), 'INVALID_INPUT');
+  }],
+  ['SCAN: direction kosong dianggap up', (L) => {
+    const r = okResult(L.run(dk('SCAN', Q, { direction: undefined })));
+    expectNum(r.totalSeek, 331, 'totalSeek');
+  }],
+  ['next(): satu langkah layanan, termasuk ujung', (L) => {
+    const s1 = okResult(L.next(dk('SCAN', [10])));
+    expectEq([s1.done, s1.target, s1.isRequest, s1.seek, s1.newHead, s1.newDirection, s1.remaining], [false, 199, false, 146, 199, 'down', [10]], 'langkah 1');
+    const s2 = okResult(L.next(dk('SCAN', s1.remaining, { head: s1.newHead, direction: s1.newDirection })));
+    expectEq([s2.target, s2.isRequest, s2.seek, s2.remaining], [10, true, 189, []], 'langkah 2');
+  }],
+  ['next(): antrean kosong mengembalikan done:true', (L) => {
+    const r = okResult(L.next(dk('FCFS', [])));
+    expectEq(r.done, true, 'done');
+  }],
+  ['run() konsisten dengan pemanggilan next() berulang', (L) => {
+    ['FCFS', 'SSTF', 'SCAN'].forEach(alg => {
+      let head = 53, direction = 'up', queue = Q.slice(), total = 0; const order = [];
+      while (queue.length) {
+        const s = okResult(L.next(dk(alg, queue, { head, direction })));
+        order.push(s.target); total += s.seek; head = s.newHead; direction = s.newDirection; queue = s.remaining;
+      }
+      const r = okResult(L.run(dk(alg, Q)));
+      expectEq(order, r.order, alg + ' order'); expectNum(total, r.totalSeek, alg + ' totalSeek');
+    });
+  }],
+  ['Input tidak valid ditolak dengan ok:false', (L) => {
+    errCode(L.run(dk('FCFS', [250])), 'INVALID_INPUT');
+    errCode(L.run(dk('FCFS', [-1])), 'INVALID_INPUT');
+    errCode(L.run(dk('FCFS', [1.5])), 'INVALID_INPUT');
+    errCode(L.run(dk('FCFS', Q, { head: 300 })), 'INVALID_INPUT');
+    errCode(L.run(dk('FCFS', Q, { maxCylinder: 0 })), 'INVALID_INPUT');
+    errCode(L.run(dk('FCFS', [])), 'EMPTY_INPUT');
+    errCode(L.run(dk('XYZ', Q)), 'UNKNOWN_ALGORITHM');
+    errCode(L.run(dk('FCFS', Array.from({ length: 31 }, (_, i) => i))), 'INVALID_INPUT');
+    errCode(L.run(null), 'INVALID_INPUT');
+  }],
+  ['Fungsi murni: tidak mengubah input dan hasil sama untuk input sama', (L) => {
+    const input = deepFreeze(dk('SCAN', Q.slice()));
+    expect(same(L.run(input), L.run(input)), 'dua panggilan dengan input sama memberi hasil berbeda');
+    expect(same(L.next(input), L.next(input)), 'next(): dua panggilan memberi hasil berbeda');
+  }],
+]);
+
+
+/* ===================== MONITOR ===================== */
+const E = [
+  { name: 'os:dispatch', tick: 1, detail: { pid: 'P1', start: 0, end: 2 } },
+  { name: 'os:page-fault', tick: 1, detail: { pid: 'P1', page: 7 } },
+  { name: 'os:dispatch', tick: 2, detail: { pid: 'P2', start: 2, end: 4 } },
+  { name: 'os:page-fault', tick: 2, detail: { pid: 'P2', page: 0 } },
+  { name: 'os:dispatch', tick: 3, detail: { pid: 'P1', start: 4, end: 6 } },
+  { name: 'os:disk-served', tick: 4, detail: { pid: 'P1', page: 7, target: 70, seek: 17 } },
+];
+
+group('Monitor', window.MonitorLogic, [
+  ['summarize: hitungan, faultRate, avgSeek, perPid', (L) => {
+    const r = okResult(L.summarize(E));
+    expectEq(r.counts, { dispatch: 3, faults: 2, diskOps: 1 }, 'counts');
+    expectNum(r.faultRate, 2 / 3, 'faultRate'); expectNum(r.avgSeek, 17, 'avgSeek');
+    expectEq(r.perPid, [{ pid: 'P1', dispatches: 2, faults: 1 }, { pid: 'P2', dispatches: 1, faults: 1 }], 'perPid');
+  }],
+  ['summarize: events kosong = semua nol', (L) => {
+    const r = okResult(L.summarize([]));
+    expectEq(r, { counts: { dispatch: 0, faults: 0, diskOps: 0 }, faultRate: 0, avgSeek: 0, perPid: [] }, 'result');
+  }],
+  ['toCsv: format baris dan header', (L) => {
+    const r = okResult(L.toCsv(E));
+    expectEq(r.csv, 'tick,event,pid,detail\n1,os:dispatch,P1,0-2\n1,os:page-fault,P1,page=7\n2,os:dispatch,P2,2-4\n2,os:page-fault,P2,page=0\n3,os:dispatch,P1,4-6\n4,os:disk-served,P1,page=7;target=70;seek=17', 'csv');
+  }],
+  ['Input tidak valid ditolak dengan ok:false', (L) => {
+    errCode(L.summarize(null), 'INVALID_INPUT');
+    errCode(L.summarize('x'), 'INVALID_INPUT');
+    errCode(L.summarize([{ name: 'os:xyz', tick: 1, detail: { pid: 'P1' } }]), 'INVALID_INPUT');
+    errCode(L.summarize([{ name: 'os:dispatch', tick: -1, detail: { pid: 'P1', start: 0, end: 1 } }]), 'INVALID_INPUT');
+    errCode(L.summarize([{ name: 'os:dispatch', tick: 1, detail: { pid: 5, start: 0, end: 1 } }]), 'INVALID_INPUT');
+    errCode(L.toCsv(undefined), 'INVALID_INPUT');
+  }],
+  ['Fungsi murni: tidak mengubah input', (L) => {
+    const input = deepFreeze(JSON.parse(JSON.stringify(E)));
+    expect(same(L.summarize(input), L.summarize(input)), 'hasil berbeda untuk input sama');
+    expect(same(L.toCsv(input), L.toCsv(input)), 'toCsv: hasil berbeda untuk input sama');
+  }],
+]);
+
+/* ===================== ANALYTICS ===================== */
+group('Analytics', window.AnalyticsLogic, [
+  ['cpuSeries: FCFS/SJF/RR', (L) => {
+    const r = okResult(L.cpuSeries([
+      { algorithm: 'FCFS', avgWaiting: 6.5, avgTurnaround: 11.25 },
+      { algorithm: 'SJF', avgWaiting: 4.75, avgTurnaround: 9.5 },
+      { algorithm: 'RR', avgWaiting: 7.5, avgTurnaround: 12.25 }]));
+    expectEq(r, { labels: ['FCFS', 'SJF', 'RR'], datasets: [{ label: 'Avg Waiting', data: [6.5, 4.75, 7.5] }, { label: 'Avg Turnaround', data: [11.25, 9.5, 12.25] }], best: { index: 1, algorithm: 'SJF' } }, 'result');
+  }],
+  ['memorySeries: FIFO/LRU/OPTIMAL', (L) => {
+    const r = okResult(L.memorySeries([{ algorithm: 'FIFO', faults: 15, hits: 5 }, { algorithm: 'LRU', faults: 12, hits: 8 }, { algorithm: 'OPTIMAL', faults: 9, hits: 11 }]));
+    expectEq(r, { labels: ['FIFO', 'LRU', 'OPTIMAL'], datasets: [{ label: 'Faults', data: [15, 12, 9] }, { label: 'Hits', data: [5, 8, 11] }], best: { index: 2, algorithm: 'OPTIMAL' } }, 'result');
+  }],
+  ['diskSeries: FCFS/SSTF/SCAN', (L) => {
+    const r = okResult(L.diskSeries([{ algorithm: 'FCFS', totalSeek: 640 }, { algorithm: 'SSTF', totalSeek: 236 }, { algorithm: 'SCAN', totalSeek: 331 }]));
+    expectEq(r, { labels: ['FCFS', 'SSTF', 'SCAN'], datasets: [{ label: 'Total Seek', data: [640, 236, 331] }], best: { index: 1, algorithm: 'SSTF' } }, 'result');
+  }],
+  ['best: nilai seri dimenangkan entri pertama', (L) => {
+    const r = okResult(L.diskSeries([{ algorithm: 'A', totalSeek: 5 }, { algorithm: 'B', totalSeek: 5 }]));
+    expectEq(r.best, { index: 0, algorithm: 'A' }, 'best');
+  }],
+  ['timelineSeries: kumulatif per tick', (L) => {
+    const r = okResult(L.timelineSeries(E));
+    expectEq(r, { labels: [0, 1, 2, 3, 4], datasets: [{ label: 'Dispatch', data: [0, 1, 2, 3, 3] }, { label: 'Page Fault', data: [0, 1, 2, 2, 2] }, { label: 'Disk Served', data: [0, 0, 0, 0, 1] }] }, 'result');
+  }],
+  ['timelineSeries: events kosong', (L) => {
+    const r = okResult(L.timelineSeries([]));
+    expectEq(r, { labels: [0], datasets: [{ label: 'Dispatch', data: [0] }, { label: 'Page Fault', data: [0] }, { label: 'Disk Served', data: [0] }] }, 'result');
+  }],
+  ['Input tidak valid ditolak dengan ok:false', (L) => {
+    errCode(L.cpuSeries([]), 'EMPTY_INPUT');
+    errCode(L.cpuSeries('x'), 'INVALID_INPUT');
+    errCode(L.cpuSeries([{ algorithm: '', avgWaiting: 1, avgTurnaround: 1 }]), 'INVALID_INPUT');
+    errCode(L.cpuSeries([{ algorithm: 'FCFS', avgWaiting: 1 }]), 'INVALID_INPUT');
+    errCode(L.memorySeries([{ algorithm: 'FIFO', faults: 'x', hits: 1 }]), 'INVALID_INPUT');
+    errCode(L.diskSeries([{ algorithm: 'FCFS', totalSeek: Infinity }]), 'INVALID_INPUT');
+    errCode(L.timelineSeries('x'), 'INVALID_INPUT');
+    errCode(L.timelineSeries([{ name: 'os:xyz', tick: 1 }]), 'INVALID_INPUT');
+    errCode(L.timelineSeries([{ name: 'os:dispatch', tick: -2 }]), 'INVALID_INPUT');
+  }],
+  ['Fungsi murni: tidak mengubah input', (L) => {
+    const runs = deepFreeze([{ algorithm: 'FCFS', totalSeek: 640 }, { algorithm: 'SSTF', totalSeek: 236 }]);
+    expect(same(L.diskSeries(runs), L.diskSeries(runs)), 'hasil berbeda untuk input sama');
+    const ev = deepFreeze(JSON.parse(JSON.stringify(E)));
+    expect(same(L.timelineSeries(ev), L.timelineSeries(ev)), 'timelineSeries: hasil berbeda untuk input sama');
+  }],
+]);
+
+/* ===================== TAMBAHKAN KASUS QA DI SINI (tugas QA) =====================
+   Pola: group('CPU (QA)', window.CpuLogic, [ ['nama kasus', (L) => { ... }], ... ]);
+   Jangan mengubah atau menghapus kasus di atas. Kasus baru harus lolos terhadap modul yang benar;
+   bila gagal karena bug di modul orang lain, jangan diubah supaya lolos: catat sebagai bug. */
+
+/* ===================== TAMPILKAN ===================== */
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+document.getElementById('rows').innerHTML = results.map(r =>
+  `<tr><td>${r.mod}</td><td>${esc(r.name)}</td><td class="${r.status}">${r.status}</td><td><code>${esc(r.detail)}</code></td></tr>`).join('');
+const c = (s) => results.filter(r => r.status === s).length;
+const sum = document.getElementById('sum');
+sum.textContent = `PASS ${c('PASS')} · FAIL ${c('FAIL')} · SKIP ${c('SKIP')} dari ${results.length} kasus`;
+sum.className = 'sum ' + (c('FAIL') === 0 ? 'ok' : 'bad');
+document.title = `${c('PASS')}/${results.length} PASS`;
+window.__results = results;
+</script>
+</body>
+</html>

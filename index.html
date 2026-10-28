@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniOS Desktop</title>
+  <link rel="stylesheet" href="styles/desktop.css">
+</head>
+<body>
+  <div id="desktop">
+    <div id="icons"></div>
+    <div id="windows"></div>
+    <div id="taskbar">
+      <button id="start-btn" title="Start" aria-label="Menu Start">⊞</button>
+      <div id="task-list"></div>
+      <div id="tray">
+        <span id="tray-metrics"></span>
+        <span id="tray-clock"></span>
+      </div>
+    </div>
+  </div>
+  <!-- Urutan penting: os.js dulu (API dan penghitung), lalu windows.js, terminal.js, terakhir loader.js -->
+  <script src="shell/os.js"></script>
+  <script src="shell/windows.js"></script>
+  <script src="shell/terminal.js"></script>
+  <script src="shell/loader.js"></script>
+</body>
+</html>
