@@ -1,6 +1,6 @@
 # MiniOS Desktop (kerangka shell)
 
-Simulator sistem operasi berbasis web: desktop environment dengan tiga aplikasi (CPU Scheduler, Memory, Disk Scheduling) yang saling terhubung lewat event.
+Simulator sistem operasi berbasis web: desktop environment dengan tiga aplikasi (CPU Scheduler, Memory, Disk Scheduling) yang saling terhubung lewat event.[Lihat Live Demo](https://zhaniha.github.io/Project-MiniOS-Desktop/)
 
 ## Menjalankan di komputer
 
