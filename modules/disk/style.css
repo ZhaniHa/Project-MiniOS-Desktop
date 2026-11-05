@@ -1,0 +1,63 @@
+/* modules/disk/style.css : semua class berprefix .disk- */
+.disk-dir-row { align-items: center; margin-top: 6px; }
+
+.disk-select,
+.disk-input {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+}
+.disk-input { flex: 1; min-width: 0; }
+
+/* Lintasan head 0..maxCylinder */
+.disk-track {
+  position: relative;
+  height: 28px;
+  margin: 6px 8px 2px;
+  border-radius: 4px;
+  background: #e2e8f0;
+}
+.disk-dot {
+  position: absolute;
+  top: 9px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+.disk-head {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 36px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #0ea5e9;
+  transition: left 0.3s ease;
+}
+.disk-scale {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 8px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.disk-stat { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+.disk-path { font-family: monospace; font-size: 12px; }
+
+.disk-msg {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.disk-compare { border-top: 1px solid #e2e8f0; padding-top: 8px; }
+.disk-compare-path { margin-top: 4px; font-size: 11px; }
+.disk-best { background: #dcfce7; font-weight: 700; }
