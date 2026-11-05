@@ -362,7 +362,113 @@ group('Analytics', window.AnalyticsLogic, [
    Pola: group('CPU (QA)', window.CpuLogic, [ ['nama kasus', (L) => { ... }], ... ]);
    Jangan mengubah atau menghapus kasus di atas. Kasus baru harus lolos terhadap modul yang benar;
    bila gagal karena bug di modul orang lain, jangan diubah supaya lolos: catat sebagai bug. */
+/* ===================== KASUS QA TAMBAHAN (Naysa) ===================== */
+{
+  /* ---------- CPU ---------- */
+  group('CPU (QA)', window.CpuLogic, [
+    ['QA: RR dengan quantum 10 (lebih besar dari semua burst) hasilnya sama dengan FCFS', (L) => {
+      // Tanpa pemotongan waktu, RR berjalan seperti antrean biasa. Angka acuan: FCFS data A (bagian 6.2).
+      const r = okResult(L.run(cpu('RR', P, 10)));
+      expectEq(g(r.gantt), 'P1:0:6 P2:6:9 P3:9:17 P4:17:19', 'gantt');
+      expectNum(r.avgWaiting, 6.5, 'avgWaiting'); expectNum(r.avgTurnaround, 11.25, 'avgTurnaround');
+    }],
+    ['QA: satu proses saja (FCFS, SJF, RR q=2)', (L) => {
+      const one = [{ pid: 'P1', arrival: 0, burst: 5 }];
+      ['FCFS', 'SJF'].forEach(alg => {
+        const r = okResult(L.run(cpu(alg, one, 2)));
+        expectEq(g(r.gantt), 'P1:0:5', alg + ' gantt');
+        expectNum(r.avgWaiting, 0, alg + ' avgWaiting'); expectNum(r.avgTurnaround, 5, alg + ' avgTurnaround');
+      });
+      const rr = okResult(L.run(cpu('RR', one, 2)));
+      expectEq(g(rr.gantt), 'P1:0:2 P1:2:4 P1:4:5', 'RR gantt');
+      expectNum(rr.avgWaiting, 0, 'RR avgWaiting'); expectNum(rr.avgTurnaround, 5, 'RR avgTurnaround');
+    }],
+    ['QA: CPU menganggur di awal (proses pertama baru datang di t=3)', (L) => {
+      const r = okResult(L.run(cpu('FCFS', [{ pid: 'A', arrival: 3, burst: 2 }], 2)));
+      expectEq(g(r.gantt), 'A:3:5', 'gantt');
+      const a = r.perProcess[0];
+      expectEq([a.completion, a.waiting, a.turnaround, a.response], [5, 0, 2, 0], 'A (completion,waiting,turnaround,response)');
+    }],
+  ]);
 
+  /* ---------- MEMORY ---------- */
+  group('Memory (QA)', window.MemoryLogic, [
+    ['QA: 1 frame saja: referensi yang berbeda dari sebelumnya pasti fault', (L) => {
+      ['FIFO', 'LRU', 'OPTIMAL'].forEach(alg => {
+        const r = okResult(L.run(mem(alg, 1, [1, 2, 1, 2])));
+        expectEq([r.faults, r.hits], [4, 0], alg + ' (faults,hits)');
+        expectNum(r.hitRatio, 0, alg + ' hitRatio');
+      });
+    }],
+    ['QA: frame cukup untuk semua page: hanya fault pertama tiap page, tanpa korban', (L) => {
+      // R berisi 6 page berbeda (7,0,1,2,3,4): 6 fault, sisanya 14 hit.
+      ['FIFO', 'LRU', 'OPTIMAL'].forEach(alg => {
+        const r = okResult(L.run(mem(alg, 6, R)));
+        expectEq([r.faults, r.hits], [6, 14], alg + ' (faults,hits)');
+        expectNum(r.hitRatio, 0.7, alg + ' hitRatio');
+        expect(r.steps.every(s => s.evicted === null), alg + ': tidak boleh ada korban');
+      });
+    }],
+    ['QA: anomali Belady: FIFO tambah frame malah tambah fault, LRU dan OPTIMAL tidak', (L) => {
+      const B = [1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5];
+      const f = (alg, n) => okResult(L.run(mem(alg, n, B))).faults;
+      expectEq([f('FIFO', 3), f('FIFO', 4)], [9, 10], 'FIFO (3 frame, 4 frame)');
+      expectEq([f('LRU', 3), f('LRU', 4)], [10, 8], 'LRU (3 frame, 4 frame)');
+      expectEq([f('OPTIMAL', 3), f('OPTIMAL', 4)], [7, 6], 'OPTIMAL (3 frame, 4 frame)');
+    }],
+    ['QA: OPTIMAL tidak pernah lebih buruk dari FIFO dan LRU (frame 1 sampai 6)', (L) => {
+      // Aturan teori (bukan angka): Optimal adalah batas terbaik. Cek juga fault + hit = jumlah referensi.
+      for (let n = 1; n <= 6; n++) {
+        const fifo = okResult(L.run(mem('FIFO', n, R))), lru = okResult(L.run(mem('LRU', n, R))), opt = okResult(L.run(mem('OPTIMAL', n, R)));
+        expect(opt.faults <= fifo.faults, n + ' frame: OPTIMAL (' + opt.faults + ') lebih buruk dari FIFO (' + fifo.faults + ')');
+        expect(opt.faults <= lru.faults, n + ' frame: OPTIMAL (' + opt.faults + ') lebih buruk dari LRU (' + lru.faults + ')');
+        [fifo, lru, opt].forEach(r => expectEq(r.faults + r.hits, R.length, n + ' frame: faults+hits'));
+      }
+    }],
+  ]);
+
+  /* ---------- DISK ---------- */
+  group('Disk (QA)', window.DiskLogic, [
+    ['QA: satu permintaan di depan dan di belakang head (FCFS dan SSTF)', (L) => {
+      ['FCFS', 'SSTF'].forEach(alg => {
+        const a = okResult(L.run(dk(alg, [60])));
+        expectNum(a.totalSeek, 7, alg + ' totalSeek [60]'); expectEq(a.order, [60], alg + ' order [60]');
+        const b = okResult(L.run(dk(alg, [40])));
+        expectNum(b.totalSeek, 13, alg + ' totalSeek [40]'); expectEq(b.order, [40], alg + ' order [40]');
+      });
+    }],
+    ['QA: SCAN turun, permintaan hanya di atas head: ke ujung 0 dulu', (L) => {
+      const r = okResult(L.run(dk('SCAN', [98], { direction: 'down' })));
+      expectEq(r.order, [0, 98], 'order'); expectNum(r.totalSeek, 151, 'totalSeek');
+    }],
+    ['QA: SCAN dengan maxCylinder 99: ujung disk mengikuti maxCylinder, bukan 199', (L) => {
+      const r = okResult(L.run(dk('SCAN', [10, 90], { head: 50, maxCylinder: 99 })));
+      expectEq(r.order, [90, 99, 10], 'order'); expectNum(r.totalSeek, 138, 'totalSeek');
+    }],
+  ]);
+
+  /* ---------- MONITOR ---------- */
+  group('Monitor (QA)', window.MonitorLogic, [
+    ['QA: avgSeek adalah rata-rata seek dari semua os:disk-served', (L) => {
+      const ev = [
+        { name: 'os:dispatch', tick: 1, detail: { pid: 'P1', start: 0, end: 2 } },
+        { name: 'os:disk-served', tick: 2, detail: { pid: 'P1', page: 7, target: 70, seek: 17 } },
+        { name: 'os:disk-served', tick: 3, detail: { pid: 'P1', page: 0, target: 0, seek: 3 } },
+      ];
+      const r = okResult(L.summarize(ev));
+      expectEq(r.counts, { dispatch: 1, faults: 0, diskOps: 2 }, 'counts');
+      expectNum(r.faultRate, 0, 'faultRate'); expectNum(r.avgSeek, 10, 'avgSeek');
+    }],
+  ]);
+
+  /* ---------- ANALYTICS ---------- */
+  group('Analytics (QA)', window.AnalyticsLogic, [
+    ['QA: memorySeries mempertahankan urutan input dan best = fault paling sedikit', (L) => {
+      const r = okResult(L.memorySeries([{ algorithm: 'LRU', faults: 12, hits: 8 }, { algorithm: 'FIFO', faults: 15, hits: 5 }]));
+      expectEq(r, { labels: ['LRU', 'FIFO'], datasets: [{ label: 'Faults', data: [12, 15] }, { label: 'Hits', data: [8, 5] }], best: { index: 0, algorithm: 'LRU' } }, 'result');
+    }],
+  ]);
+}
 /* ===================== TAMPILKAN ===================== */
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 document.getElementById('rows').innerHTML = results.map(r =>
