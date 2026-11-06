@@ -1,0 +1,60 @@
+/* modules/analytics/style.css: semua class berprefix anal- */
+
+/* Isi jendela bisa di-scroll karena ada 4 grafik */
+.anal-root {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px;
+  color: #111827;
+}
+
+.anal-card {
+  margin-bottom: 12px;
+}
+
+.anal-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.anal-card-title {
+  font-weight: 600;
+}
+
+.anal-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.anal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* SVG mengikuti lebar jendela; latar putih ada di dalam SVG sendiri */
+.anal-chart-body svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.anal-msg {
+  padding: 24px 12px;
+  text-align: center;
+  color: #4b5563;
+  background: #ffffff;
+  border: 1px dashed #9ca3af;
+  border-radius: 6px;
+}
+
+.anal-msg-error {
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
