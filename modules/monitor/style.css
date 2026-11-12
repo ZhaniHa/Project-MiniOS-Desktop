@@ -1,0 +1,20 @@
+/* Semua class berprefix moni- */
+.moni-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+}
+.moni-card {
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  text-align: center;
+}
+.moni-card-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+.moni-card-label {
+  font-size: 12px;
+  opacity: 0.75;
+}
