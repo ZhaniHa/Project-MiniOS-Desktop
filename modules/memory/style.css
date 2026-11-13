@@ -1,0 +1,96 @@
+/* modules/memory/style.css — khusus modul Memory (prefix .mem-). */
+
+.mem-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.mem-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.mem-label-refs {
+  flex: 1;
+  min-width: 220px;
+}
+
+.mem-input {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.mem-input:focus {
+  outline: 2px solid #38bdf8;
+  outline-offset: 0;
+  border-color: #0ea5e9;
+}
+
+.mem-input-frame {
+  width: 64px;
+}
+
+.mem-input-refs {
+  flex: 1;
+  min-width: 140px;
+}
+
+.mem-error {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.mem-step-info {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.mem-step-info.mem-fault { color: #b91c1c; }
+.mem-step-info.mem-hit   { color: #15803d; }
+
+.mem-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mem-counters {
+  margin: 0;
+}
+
+.mem-compare-box {
+  margin-top: 8px;
+}
+
+.mem-compare-box .app-table th,
+.mem-compare-box .app-table td {
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.mem-compare-box tr.mem-best {
+  background: #dcfce7;
+  font-weight: 700;
+}
+
+.mem-compare-note {
+  margin-top: 6px;
+  font-style: italic;
+  font-size: 11px;
+  color: #64748b;
+}
